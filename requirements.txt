@@ -1,0 +1,8 @@
+torch>=2.1
+transformers>=4.36
+datasets>=2.16
+matplotlib>=3.7
+tqdm
+numpy
+mamba-ssm>=2.0
+causal-conv1d>=1.4

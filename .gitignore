@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.DS_Store
+
+# Generated directories (keep .gitkeep)
+data/*
+!data/.gitkeep
+out/*
+!out/.gitkeep
