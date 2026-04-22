@@ -3,8 +3,19 @@ __pycache__/
 *.egg-info/
 .DS_Store
 
-# Generated directories (keep .gitkeep)
+# Generated data
 data/*
 !data/.gitkeep
+
+# Generated outputs
 out/*
 !out/.gitkeep
+
+# Keep benchmark artifacts
+!out/*.png
+!out/*.json
+!out/*.txt
+
+# Ignore large checkpoints
+out/*.pt
+out/*.pth
