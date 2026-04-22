@@ -11,7 +11,7 @@ Reproduce the core claims of the original Mamba paper at small scale:
 - Benchmark scaling behavior across sequence lengths (512–8192)
 - Validate that Mamba achieves competitive quality with better efficiency
 
-All experiments run on an NVIDIA A100 40GB GPU via [Lightning.ai](https://lightning.ai), using BF16 precision.
+All experiments run on a Lightning.ai instance with an NVIDIA A100 GPU (40GB VRAM, 312 BF16 TFLOPs) and 30 CPUs, using BF16 precision.
 
 ## Repository Structure
 
@@ -43,13 +43,31 @@ All experiments run on an NVIDIA A100 40GB GPU via [Lightning.ai](https://lightn
 
 ## Setup
 
-Requires Linux, NVIDIA GPU (A100 recommended), CUDA 11.6+, Python 3.10+.
+Recent testing shows that newer Python versions (like 3.12) can cause build instability with `mamba-ssm`. **Python 3.10 is explicitly required.** We recommend an isolated conda environment to ensure stable builds.
+
+Requires Linux, NVIDIA GPU (A100 recommended for BF16), and CUDA 11.6+.
 
 ```bash
+# 1. Create and activate a fresh Python 3.10 environment
+conda create -n mamba310 python=3.10 -y
+conda activate mamba310
+
+# 2. Install PyTorch (adjust to match your CUDA version)
+pip install torch torchvision torchaudio
+
+# 3. Install build basics and Mamba dependencies directly
+pip install ninja
+pip install causal-conv1d --no-build-isolation
+pip install mamba-ssm --no-build-isolation
+
+# 4. Install remaining project requirements
 pip install -r requirements.txt
 ```
 
-> **Note:** `mamba-ssm` and `causal-conv1d` require CUDA compilation. If installation fails, try `pip install mamba-ssm --no-build-isolation`.
+To verify your environment is correctly configured for the A100 and Mamba, run:
+```bash
+python scripts/check_env.py
+```
 
 ## Execution
 
