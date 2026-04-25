@@ -53,6 +53,8 @@ def measure_throughput(model, input_ids, warmup=WARMUP_ITERS, iters=BENCH_ITERS)
 def run(args):
     device = "cuda"
     dtype = resolve_dtype(args.dtype)
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
     results = []
 
     model_builders = [("mamba", build_mamba), ("transformer", build_transformer)]
@@ -109,7 +111,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--seq_lens", type=int, nargs="+",
                         default=[256, 512, 1024, 2048, 4096, 8192])
-    parser.add_argument("--batch_size", type=int, default=4)
+    parser.add_argument("--batch_size", type=int, default=8)
     parser.add_argument("--dtype", choices=["auto", "float32", "bfloat16", "float16"],
                         default="auto")
     parser.add_argument("--out_dir", type=str, default="out")

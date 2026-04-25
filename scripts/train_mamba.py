@@ -21,15 +21,15 @@ from tqdm.auto import tqdm
 from transformers import GPT2Config, GPT2LMHeadModel
 
 DEFAULTS = dict(
-    seq_len=1024,
-    batch_size=8,
-    grad_accum_steps=4,
+    seq_len=2048,
+    batch_size=16,
+    grad_accum_steps=2,
     lr=6e-4,
     weight_decay=0.1,
-    warmup_steps=500,
+    warmup_steps=200,
     max_steps=10_000,
-    eval_interval=500,
-    eval_steps=50,
+    eval_interval=250,
+    eval_steps=25,
     log_interval=50,
     dtype="bfloat16",
     seed=42,
@@ -129,6 +129,8 @@ def train(args):
     cfg = {**DEFAULTS, **vars(args)}
     os.makedirs(cfg["out_dir"], exist_ok=True)
     torch.manual_seed(cfg["seed"])
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     pt_dtype = {"float32": torch.float32, "bfloat16": torch.bfloat16,
@@ -153,7 +155,11 @@ def train(args):
         model.parameters(), lr=cfg["lr"],
         weight_decay=cfg["weight_decay"], betas=(0.9, 0.95)
     )
-    scaler = torch.amp.GradScaler("cuda", enabled=(cfg["dtype"] == "float16"))
+    
+    # Only use GradScaler for float16; bfloat16 doesn't need it
+    use_scaler = cfg["dtype"] == "float16"
+    if use_scaler:
+        scaler = torch.amp.GradScaler("cuda")
 
     log = {"train_loss": [], "val_loss": [], "step": [], "throughput": [],
            "config": {"model": cfg["model"], "seq_len": cfg["seq_len"],
@@ -185,13 +191,20 @@ def train(args):
                 )
                 loss = loss / cfg["grad_accum_steps"]
 
-            scaler.scale(loss).backward()
+            if use_scaler:
+                scaler.scale(loss).backward()
+            else:
+                loss.backward()
             accum_loss += loss.item()
 
-        scaler.unscale_(optimizer)
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-        scaler.step(optimizer)
-        scaler.update()
+        if use_scaler:
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            optimizer.step()
 
         if step % cfg["log_interval"] == 0:
             dt = time.time() - t0

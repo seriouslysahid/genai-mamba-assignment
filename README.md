@@ -116,13 +116,11 @@ conda activate mamba310
 # 2. Install PyTorch (adjust to match your CUDA version)
 pip install torch torchvision torchaudio
 
-# 3. Install build basics and Mamba dependencies directly
-pip install ninja
-pip install causal-conv1d --no-build-isolation
-pip install mamba-ssm --no-build-isolation
-
-# 4. Install remaining project requirements
+# 3. Install remaining project requirements
 pip install -r requirements.txt
+
+# 4. Build and install Mamba dependencies from source for A100
+python scripts/build_mamba_deps.py
 ```
 
 To verify your environment is correctly configured for the A100 and Mamba, run:
@@ -183,6 +181,8 @@ After running the full pipeline, `out/` will contain:
 | Hidden dim | 768 | 768 |
 | SSM state dim | 16 | — |
 | Attention heads | — | 12 |
+| Batch size | 16 | 16 |
+| Sequence length | 2048 | 2048 |
 | Precision | BF16 | BF16 |
 
 Mamba config follows the paper (24 layers, d_model=768, d_state=16). The Transformer uses a GPT-2 architecture with comparable parameter count. Both are trained and benchmarked in BF16 on an A100 40GB GPU.

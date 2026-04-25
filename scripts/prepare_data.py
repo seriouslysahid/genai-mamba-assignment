@@ -26,21 +26,37 @@ def main(args):
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name)
 
     print(f"Loading dataset ({args.dataset_name}, streaming train split)...")
+    # Stream the dataset, batched processing is much faster
     ds = load_dataset(args.dataset_name, split="train", streaming=True)
 
     for split_name, n_examples in [("train", args.num_train), ("val", args.num_val)]:
         print(f"\nTokenizing {split_name} split ({n_examples} examples)...")
         all_ids = []
+        
+        # Take the required number of examples from the stream
+        ds_subset = ds.take(n_examples)
+        
+        # We can map with batched=True to speed up tokenization
+        def tokenize_batch(batch):
+            # Tokenize and filter out empty sequences
+            texts = [t for t in batch["text"] if t and t.strip()]
+            if not texts:
+                return {"ids": []}
+            # encode produces a list of lists of ints
+            ids = tokenizer(texts, add_special_tokens=False)["input_ids"]
+            # Flatten the batch
+            flat_ids = [i for seq in ids for i in seq]
+            return {"ids": flat_ids}
+
+        # Apply map operation - IterableDatasets support batched=True mapping
+        ds_tokenized = ds_subset.map(tokenize_batch, batched=True, batch_size=1000, remove_columns=list(next(iter(ds_subset)).keys()))
+
         count = 0
-        for example in tqdm(ds, total=n_examples, desc=f"tokenizing {split_name}", unit="example"):
+        for item in tqdm(ds_tokenized, total=n_examples, desc=f"tokenizing {split_name}", unit="batch"):
+            all_ids.extend(item["ids"])
+            count += 1
             if count >= n_examples:
                 break
-            text = example.get("text", "")
-            if not text.strip():
-                continue
-            ids = tokenizer.encode(text)
-            all_ids.extend(ids)
-            count += 1
 
         arr = np.array(all_ids, dtype=np.uint16)
         out_path = os.path.join(args.out_dir, f"{split_name}.bin")
