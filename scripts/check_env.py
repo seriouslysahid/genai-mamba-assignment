@@ -28,8 +28,12 @@ def main():
         
         print(f"CUDA Available: Yes ({torch.version.cuda})")
         print(f"GPU: {torch.cuda.get_device_name(0)}")
+        capability = torch.cuda.get_device_capability(0)
+        print(f"GPU capability: sm_{capability[0]}{capability[1]}")
         
-        if not torch.cuda.is_bf16_supported():
+        if capability[0] < 8:
+            print("  [INFO] Use float16 on this GPU. BF16 kernels require sm_80+.")
+        elif not torch.cuda.is_bf16_supported():
             print("  [WARNING] GPU does not support bfloat16. Training might be slower.")
         else:
             print("  [OK] bfloat16 is supported.")

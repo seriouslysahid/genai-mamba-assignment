@@ -85,6 +85,9 @@ The dependency cell uninstalls old `mamba-ssm` / `causal-conv1d` wheels before
 reinstalling, because stale wheels can be linked against the wrong CUDA runtime.
 It also runs a small Mamba model-construction smoke test before training starts.
 
+On Tesla T4 (`sm_75`), the notebook forces `float16` even if PyTorch reports
+BF16 support. Triton BF16 kernels require Ampere (`sm_80`) or newer.
+
 Default data scale is `25_000` train examples and `2_000` validation examples,
 roughly five times the original smoke-test shard. On a stable Colab Pro/L4
 runtime, `50_000` / `5_000` is a reasonable next step. `100_000` / `10_000` is a
