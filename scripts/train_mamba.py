@@ -25,9 +25,10 @@ DEFAULTS = dict(
     batch_size=16,
     grad_accum_steps=2,
     lr=6e-4,
+    min_lr=6e-5,
     weight_decay=0.1,
     warmup_steps=200,
-    max_steps=10_000,
+    max_steps=5_000,
     eval_interval=250,
     eval_steps=25,
     log_interval=50,
@@ -99,12 +100,13 @@ def build_transformer(seq_len=1024):
     return GPT2LMHeadModel(GPT2Config(**cfg))
 
 
-def get_lr(step, warmup, max_steps, base_lr):
+def get_lr(step, warmup, max_steps, base_lr, min_lr=6e-5):
     """Linear warmup then cosine decay."""
     if step < warmup:
         return base_lr * (step + 1) / warmup
     progress = (step - warmup) / max(1, max_steps - warmup)
-    return base_lr * 0.5 * (1.0 + math.cos(math.pi * progress))
+    cosine = base_lr * 0.5 * (1.0 + math.cos(math.pi * progress))
+    return max(min_lr, cosine)
 
 
 @torch.no_grad()
@@ -147,9 +149,11 @@ def train(args):
     train_ds = PileShardDataset(cfg["data_dir"], "train", cfg["seq_len"])
     val_ds = PileShardDataset(cfg["data_dir"], "val", cfg["seq_len"])
     train_loader = DataLoader(train_ds, batch_size=cfg["batch_size"], shuffle=True,
-                              num_workers=2, pin_memory=True, drop_last=True)
+                              num_workers=4, pin_memory=True, drop_last=True,
+                              persistent_workers=True, prefetch_factor=4,)
     val_loader = DataLoader(val_ds, batch_size=cfg["batch_size"], shuffle=False,
-                            num_workers=2, pin_memory=True, drop_last=True)
+                            num_workers=2, pin_memory=True, drop_last=True,
+                            persistent_workers=True, prefetch_factor=4,)
 
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=cfg["lr"],
@@ -170,7 +174,8 @@ def train(args):
 
     pbar = tqdm(range(cfg["max_steps"]), desc=f"training {cfg['model']}", unit="step")
     for step in pbar:
-        lr = get_lr(step, cfg["warmup_steps"], cfg["max_steps"], cfg["lr"])
+        lr = get_lr(step, cfg["warmup_steps"], cfg["max_steps"],
+                    cfg["lr"], cfg["min_lr"])
         for pg in optimizer.param_groups:
             pg["lr"] = lr
 
@@ -225,8 +230,9 @@ def train(args):
         if step > 0 and step % cfg["eval_interval"] == 0:
             val_loss = estimate_loss(model, val_loader, cfg["eval_steps"], device)
             ppl = math.exp(min(val_loss, 20))
-            print(f"  → val loss {val_loss:.4f} | perplexity {ppl:.2f}")
-            log["val_loss"].append({"step": step, "loss": val_loss, "ppl": ppl})
+            bpb = val_loss / math.log(2)
+            print(f"  → val loss {val_loss:.4f} | ppl {ppl:.2f} | bpb {bpb:.4f}")
+            log["val_loss"].append({"step": step, "loss": val_loss, "ppl": ppl, "bpb": bpb})
 
     # Save checkpoint and log
     tag = cfg["model"]

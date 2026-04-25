@@ -198,6 +198,16 @@ def main():
     for repo_path in repo_paths:
         install_package(repo_path)
     
+    # Pin transformers to mamba-compatible version
+    print("--- Pinning transformers to mamba-compatible version ---")
+    print("  mamba-ssm 2.2.4 requires transformers<4.40")
+    print("  (GreedySearchDecoderOnlyOutput removed in 4.40+)")
+    subprocess.run(
+        [sys.executable, "-m", "pip", "install", "-q", "transformers==4.39.3"],
+        check=True
+    )
+    print("✓ transformers==4.39.3 installed\n")
+    
     # Run smoke test
     smoke_test()
     

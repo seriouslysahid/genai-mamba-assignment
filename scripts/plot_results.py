@@ -76,17 +76,17 @@ def plot_val_perplexity(mamba_log, transformer_log, out_dir):
 
 
 def plot_throughput(bench_results, out_dir):
-    mamba = [r for r in bench_results if r["model"] == "mamba" and r["tokens_per_sec"]]
-    trans = [r for r in bench_results if r["model"] == "transformer" and r["tokens_per_sec"]]
+    mamba = [r for r in bench_results if r["model"] == "mamba" and r.get("inference_tokens_per_sec")]
+    trans = [r for r in bench_results if r["model"] == "transformer" and r.get("inference_tokens_per_sec")]
 
     fig, ax = plt.subplots()
     if mamba:
         ax.plot([r["seq_len"] for r in mamba],
-                [r["tokens_per_sec"] for r in mamba],
+                [r["inference_tokens_per_sec"] for r in mamba],
                 "o-", label="Mamba-130M", color=COLORS["mamba"], linewidth=1.5)
     if trans:
         ax.plot([r["seq_len"] for r in trans],
-                [r["tokens_per_sec"] for r in trans],
+                [r["inference_tokens_per_sec"] for r in trans],
                 "s-", label="Transformer-130M", color=COLORS["transformer"], linewidth=1.5)
     ax.set_xlabel("Sequence Length")
     ax.set_ylabel("Tokens / sec")
@@ -100,18 +100,47 @@ def plot_throughput(bench_results, out_dir):
     print(f"Saved → {path}")
 
 
+def plot_training_throughput(bench_results, out_dir):
+    mamba = [r for r in bench_results
+             if r["model"] == "mamba" and r.get("training_tokens_per_sec")]
+    trans = [r for r in bench_results
+             if r["model"] == "transformer" and r.get("training_tokens_per_sec")]
+    
+    fig, ax = plt.subplots()
+    if mamba:
+        ax.plot([r["seq_len"] for r in mamba],
+                [r["training_tokens_per_sec"] for r in mamba],
+                "o-", label="Mamba-130M", color=COLORS["mamba"], linewidth=1.5)
+    if trans:
+        ax.plot([r["seq_len"] for r in trans],
+                [r["training_tokens_per_sec"] for r in trans],
+                "s-", label="Transformer-130M",
+                color=COLORS["transformer"], linewidth=1.5)
+    ax.set_xlabel("Sequence Length")
+    ax.set_ylabel("Training Tokens / sec")
+    ax.set_title("Training Throughput vs Sequence Length\n"
+                 "(forward + backward + optimizer step)")
+    ax.legend()
+    ax.grid(alpha=0.3)
+    ax.set_xscale("log", base=2)
+    path = os.path.join(out_dir, "training_throughput.png")
+    fig.savefig(path)
+    plt.close(fig)
+    print(f"Saved → {path}")
+
+
 def plot_memory(bench_results, out_dir):
-    mamba = [r for r in bench_results if r["model"] == "mamba" and r["peak_memory_mb"]]
-    trans = [r for r in bench_results if r["model"] == "transformer" and r["peak_memory_mb"]]
+    mamba = [r for r in bench_results if r["model"] == "mamba" and r.get("inference_peak_memory_mb")]
+    trans = [r for r in bench_results if r["model"] == "transformer" and r.get("inference_peak_memory_mb")]
 
     fig, ax = plt.subplots()
     if mamba:
         ax.plot([r["seq_len"] for r in mamba],
-                [r["peak_memory_mb"] / 1024 for r in mamba],
+                [r["inference_peak_memory_mb"] / 1024 for r in mamba],
                 "o-", label="Mamba-130M", color=COLORS["mamba"], linewidth=1.5)
     if trans:
         ax.plot([r["seq_len"] for r in trans],
-                [r["peak_memory_mb"] / 1024 for r in trans],
+                [r["inference_peak_memory_mb"] / 1024 for r in trans],
                 "s-", label="Transformer-130M", color=COLORS["transformer"], linewidth=1.5)
     ax.set_xlabel("Sequence Length")
     ax.set_ylabel("Peak GPU Memory (GB)")
@@ -126,10 +155,10 @@ def plot_memory(bench_results, out_dir):
 
 
 def plot_speedup(bench_results, out_dir):
-    mamba = {r["seq_len"]: r["tokens_per_sec"] for r in bench_results
-             if r["model"] == "mamba" and r["tokens_per_sec"]}
-    trans = {r["seq_len"]: r["tokens_per_sec"] for r in bench_results
-             if r["model"] == "transformer" and r["tokens_per_sec"]}
+    mamba = {r["seq_len"]: r["inference_tokens_per_sec"] for r in bench_results
+             if r["model"] == "mamba" and r.get("inference_tokens_per_sec")}
+    trans = {r["seq_len"]: r["inference_tokens_per_sec"] for r in bench_results
+             if r["model"] == "transformer" and r.get("inference_tokens_per_sec")}
     common = sorted(set(mamba) & set(trans))
     if not common:
         return
@@ -146,6 +175,75 @@ def plot_speedup(bench_results, out_dir):
     fig.savefig(path)
     plt.close(fig)
     print(f"Saved → {path}")
+
+
+def print_slide_summary(log_dir):
+    """Print a ready-to-copy table for slide 15."""
+    import math
+    
+    summary = {}
+    for model in ["mamba", "transformer"]:
+        path = os.path.join(log_dir, f"{model}_eval.json")
+        if os.path.exists(path):
+            data = load_json(path)
+            summary[model] = {
+                "perplexity": data.get("perplexity", "—"),
+                "bpb":        data.get("bpb", "—"),
+            }
+    
+    bench_path = os.path.join(log_dir, "benchmark_results.json")
+    if os.path.exists(bench_path):
+        raw = load_json(bench_path)
+        results = raw["results"] if isinstance(raw, dict) else raw
+        
+        for model in ["mamba", "transformer"]:
+            if model not in summary:
+                summary[model] = {}
+            
+            for r in results:
+                if r["model"] != model:
+                    continue
+                sl = r["seq_len"]
+                if sl == 1024:
+                    summary[model]["inf_tps_1024"] = (
+                        f"{r['inference_tokens_per_sec']:,.0f}"
+                        if r.get("inference_tokens_per_sec") else "OOM")
+                    summary[model]["trn_tps_1024"] = (
+                        f"{r['training_tokens_per_sec']:,.0f}"
+                        if r.get("training_tokens_per_sec") else "OOM")
+                if sl == 4096:
+                    summary[model]["inf_tps_4096"] = (
+                        f"{r['inference_tokens_per_sec']:,.0f}"
+                        if r.get("inference_tokens_per_sec") else "OOM")
+                    summary[model]["trn_tps_4096"] = (
+                        f"{r['training_tokens_per_sec']:,.0f}"
+                        if r.get("training_tokens_per_sec") else "OOM")
+                    summary[model]["trn_mem_4096"] = (
+                        f"{r['training_peak_memory_mb']/1024:.2f} GB"
+                        if r.get("training_peak_memory_mb") else "OOM")
+    
+    print("\n" + "=" * 62)
+    print("SLIDE 15 — Benchmark Results (copy into slides)")
+    print("=" * 62)
+    print(f"{'Metric':<32} {'Mamba':>12} {'Transformer':>14}")
+    print("-" * 62)
+    
+    rows = [
+        ("Perplexity",                    "perplexity",  "perplexity"),
+        ("BPB",                           "bpb",         "bpb"),
+        ("Inf. throughput @ 1024 (tok/s)","inf_tps_1024","inf_tps_1024"),
+        ("Trn. throughput @ 1024 (tok/s)","trn_tps_1024","trn_tps_1024"),
+        ("Inf. throughput @ 4096 (tok/s)","inf_tps_4096","inf_tps_4096"),
+        ("Trn. throughput @ 4096 (tok/s)","trn_tps_4096","trn_tps_4096"),
+        ("Trn. memory @ 4096",            "trn_mem_4096","trn_mem_4096"),
+    ]
+    
+    for label, mkey, tkey in rows:
+        m = summary.get("mamba", {}).get(mkey, "—")
+        t = summary.get("transformer", {}).get(tkey, "—")
+        print(f"{label:<32} {str(m):>12} {str(t):>14}")
+    
+    print("=" * 62)
 
 
 def main(args):
@@ -169,10 +267,13 @@ def main(args):
         # handle both old (list) and new ({meta, results}) formats
         bench = raw["results"] if isinstance(raw, dict) and "results" in raw else raw
         plot_throughput(bench, args.out_dir)
+        plot_training_throughput(bench, args.out_dir)
         plot_memory(bench, args.out_dir)
         plot_speedup(bench, args.out_dir)
     else:
         print(f"Benchmark results not found at {bench_path}. Skipping throughput/memory plots.")
+    
+    print_slide_summary(args.log_dir)
 
 
 if __name__ == "__main__":

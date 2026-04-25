@@ -784,7 +784,7 @@ Our reproduction methodology
 
 \- Baseline: GPT-2-style Transformer (~130M)  
 
-\- Environment: Lightning.ai A100 (40GB VRAM, 30 CPUs, 312 BF16 TFLOPs), Python 3.10
+\- Environment: Lightning.ai A100 (40GB VRAM, 30 CPUs, 312 BF16 TFLOPs), Python 3.12
 
 
 

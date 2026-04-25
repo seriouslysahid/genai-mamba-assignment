@@ -16,8 +16,8 @@ import torch
 from tqdm.auto import tqdm
 from train_mamba import build_mamba, build_transformer
 
-WARMUP_ITERS = 5
-BENCH_ITERS = 20
+WARMUP_ITERS = 10
+BENCH_ITERS = 50
 
 
 def resolve_dtype(dtype):
@@ -50,6 +50,48 @@ def measure_throughput(model, input_ids, warmup=WARMUP_ITERS, iters=BENCH_ITERS)
     return tok_per_sec, peak_mem_mb
 
 
+def measure_training_throughput(model, input_ids, optimizer,
+                                warmup=WARMUP_ITERS, iters=BENCH_ITERS):
+    """Returns (training tokens/sec, peak_memory_mb) for a full
+    forward + backward + optimizer step. This is the relevant measure
+    for the paper's efficiency claims, which concern training cost."""
+    model.train()
+    torch.cuda.reset_peak_memory_stats()
+    torch.cuda.synchronize()
+    
+    for _ in range(warmup):
+        optimizer.zero_grad(set_to_none=True)
+        logits = model(input_ids).logits
+        loss = torch.nn.functional.cross_entropy(
+            logits[:, :-1].reshape(-1, logits.size(-1)),
+            input_ids[:, 1:].reshape(-1),
+        )
+        loss.backward()
+        optimizer.step()
+    
+    torch.cuda.synchronize()
+    torch.cuda.reset_peak_memory_stats()
+    
+    t0 = time.perf_counter()
+    for _ in range(iters):
+        optimizer.zero_grad(set_to_none=True)
+        logits = model(input_ids).logits
+        loss = torch.nn.functional.cross_entropy(
+            logits[:, :-1].reshape(-1, logits.size(-1)),
+            input_ids[:, 1:].reshape(-1),
+        )
+        loss.backward()
+        optimizer.step()
+    
+    torch.cuda.synchronize()
+    elapsed = time.perf_counter() - t0
+    
+    tok_per_sec = input_ids.numel() * iters / elapsed
+    peak_mem_mb = torch.cuda.max_memory_allocated() / (1024 ** 2)
+    model.eval()
+    return tok_per_sec, peak_mem_mb
+
+
 def run(args):
     device = "cuda"
     dtype = resolve_dtype(args.dtype)
@@ -69,25 +111,44 @@ def run(args):
         n_params = sum(p.numel() for p in model.parameters())
         print(f"Parameters: {n_params / 1e6:.1f}M")
 
+        optimizer = torch.optim.AdamW(model.parameters(), lr=6e-4)
+
         for seq_len in tqdm(args.seq_lens, desc=f"{name} sequence lengths", unit="seq_len"):
-            input_ids = torch.randint(0, 50277, (args.batch_size, seq_len), device=device)
+            inf_ids = torch.randint(0, 50277, (args.batch_size, seq_len), device=device)
+            trn_ids = torch.randint(0, 50277, (args.train_batch_size, seq_len), device=device)
+            
             try:
-                tok_s, mem_mb = measure_throughput(model, input_ids)
-                print(f"  seq_len={seq_len:>5d} | {tok_s:>10.0f} tok/s | "
-                      f"{mem_mb:>8.1f} MB peak")
+                inf_tps, inf_mem = measure_throughput(model, inf_ids)
+                print(f"  seq_len={seq_len:>5d} | inf {inf_tps:>10.0f} tok/s | "
+                      f"{inf_mem:>8.1f} MB")
+                
+                try:
+                    trn_tps, trn_mem = measure_training_throughput(model, trn_ids, optimizer)
+                    print(f"  seq_len={seq_len:>5d} | trn {trn_tps:>10.0f} tok/s | "
+                          f"{trn_mem:>8.1f} MB")
+                except torch.cuda.OutOfMemoryError:
+                    trn_tps, trn_mem = None, None
+                    print(f"  seq_len={seq_len:>5d} | trn OOM")
+                    torch.cuda.empty_cache()
+                
                 results.append({
                     "model": name, "seq_len": seq_len,
                     "batch_size": args.batch_size,
-                    "tokens_per_sec": round(tok_s, 1),
-                    "peak_memory_mb": round(mem_mb, 1),
+                    "train_batch_size": args.train_batch_size,
+                    "inference_tokens_per_sec": round(inf_tps, 1),
+                    "training_tokens_per_sec":  round(trn_tps, 1) if trn_tps else None,
+                    "inference_peak_memory_mb": round(inf_mem, 1),
+                    "training_peak_memory_mb":  round(trn_mem, 1) if trn_mem else None,
                     "parameters_M": round(n_params / 1e6, 1),
                 })
             except torch.cuda.OutOfMemoryError:
-                print(f"  seq_len={seq_len:>5d} | OOM")
+                print(f"  seq_len={seq_len:>5d} | OOM (inference)")
                 results.append({
                     "model": name, "seq_len": seq_len,
-                    "batch_size": args.batch_size,
-                    "tokens_per_sec": None, "peak_memory_mb": None,
+                    "inference_tokens_per_sec": None,
+                    "training_tokens_per_sec":  None,
+                    "inference_peak_memory_mb": None,
+                    "training_peak_memory_mb":  None,
                     "parameters_M": round(n_params / 1e6, 1),
                     "error": "OOM",
                 })
@@ -112,6 +173,9 @@ if __name__ == "__main__":
     parser.add_argument("--seq_lens", type=int, nargs="+",
                         default=[256, 512, 1024, 2048, 4096, 8192])
     parser.add_argument("--batch_size", type=int, default=8)
+    parser.add_argument("--train_batch_size", type=int, default=4,
+                        help="Batch size for training throughput benchmark "
+                             "(smaller than inference due to backward memory cost)")
     parser.add_argument("--dtype", choices=["auto", "float32", "bfloat16", "float16"],
                         default="auto")
     parser.add_argument("--out_dir", type=str, default="out")

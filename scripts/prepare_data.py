@@ -23,18 +23,17 @@ def main(args):
     os.makedirs(args.out_dir, exist_ok=True)
 
     print(f"Loading tokenizer ({args.tokenizer_name})...")
-    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name)
+    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name, use_fast=True)
 
     print(f"Loading dataset ({args.dataset_name}, streaming train split)...")
     # Stream the dataset, batched processing is much faster
-    ds = load_dataset(args.dataset_name, split="train", streaming=True)
+    ds_train = load_dataset(args.dataset_name, split="train", streaming=True)
+    ds_val   = load_dataset(args.dataset_name, split="train", streaming=True).skip(args.num_train)
 
-    for split_name, n_examples in [("train", args.num_train), ("val", args.num_val)]:
+    for split_name, n_examples, ds_subset in [("train", args.num_train, ds_train),
+                                               ("val",   args.num_val,   ds_val),]:
         print(f"\nTokenizing {split_name} split ({n_examples} examples)...")
         all_ids = []
-        
-        # Take the required number of examples from the stream
-        ds_subset = ds.take(n_examples)
         
         # We can map with batched=True to speed up tokenization
         def tokenize_batch(batch):
@@ -49,7 +48,7 @@ def main(args):
             return {"ids": flat_ids}
 
         # Apply map operation - IterableDatasets support batched=True mapping
-        ds_tokenized = ds_subset.map(tokenize_batch, batched=True, batch_size=1000, remove_columns=list(next(iter(ds_subset)).keys()))
+        ds_tokenized = ds_subset.map(tokenize_batch, batched=True, batch_size=1000, remove_columns=["text", "meta"])
 
         count = 0
         for item in tqdm(ds_tokenized, total=n_examples, desc=f"tokenizing {split_name}", unit="batch"):
@@ -68,9 +67,9 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--num_train", type=int, default=50_000,
+    parser.add_argument("--num_train", type=int, default=300_000,
                         help="Number of Pile examples for training split")
-    parser.add_argument("--num_val", type=int, default=2_000,
+    parser.add_argument("--num_val", type=int, default=5_000,
                         help="Number of Pile examples for validation split")
     parser.add_argument("--dataset_name", type=str,
                         default="monology/pile-uncopyrighted",

@@ -13,10 +13,10 @@ def main():
     # 1. Python version
     py_version = sys.version_info
     print(f"Python: {py_version.major}.{py_version.minor}.{py_version.micro}")
-    if py_version.major != 3 or py_version.minor != 10:
-        print("  [WARNING] Python 3.10 is strongly recommended for stable Mamba builds.")
+    if py_version.major != 3 or py_version.minor < 10:
+        print(f"  [WARNING] Python 3.10+ required, got {py_version.major}.{py_version.minor}")
     else:
-        print("  [OK] Python version is 3.10")
+        print(f"  [OK] Python {py_version.major}.{py_version.minor}")
 
     # 2. CUDA & BF16
     try:
@@ -56,6 +56,21 @@ def main():
         print("  [OK] mamba_ssm imported successfully.")
     except ImportError as e:
         print(f"  [ERROR] Failed to import mamba_ssm: {e}")
+    
+    try:
+        import torch
+        from mamba_ssm import Mamba
+        dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+        m = Mamba(d_model=128, d_state=16, d_conv=4, expand=2).cuda().to(dtype)
+        x = torch.randn(1, 32, 128, device="cuda", dtype=dtype)
+        y = m(x)
+        assert y.shape == x.shape
+        del m, x, y
+        torch.cuda.empty_cache()
+        print("  [OK] Mamba CUDA kernel forward pass.")
+    except Exception as e:
+        print(f"  [ERROR] Mamba kernel smoke test failed: {e}")
+        sys.exit(1)
 
     print("--- Check Complete ---")
 

@@ -87,7 +87,8 @@ def main(args):
                             num_workers=2, pin_memory=True, drop_last=True)
 
     loss, ppl = evaluate(model, val_loader, device, max_batches=args.max_batches)
-    print(f"Val loss: {loss:.4f} | Perplexity: {ppl:.2f}")
+    bpb = round(loss / math.log(2), 4)
+    print(f"Val loss: {loss:.4f} | Perplexity: {ppl:.2f} | BPB: {bpb:.4f}")
 
     tokenizer = AutoTokenizer.from_pretrained("EleutherAI/gpt-neox-20b")
     prompts = [
@@ -105,6 +106,7 @@ def main(args):
         "parameters_M": round(n_params / 1e6, 1),
         "val_loss": round(loss, 4),
         "perplexity": round(ppl, 2),
+        "bpb": bpb,
         "samples": samples,
     }
     out_path = os.path.join(args.out_dir, f"{args.model}_eval.json")
