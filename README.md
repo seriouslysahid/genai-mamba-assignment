@@ -77,6 +77,10 @@ Recommended install strategy in Colab:
 - choose the correct CXX11 ABI wheel dynamically from
   `torch._C._GLIBCXX_USE_CXX11_ABI`
 
+The pinned wheel pair is `causal-conv1d==1.5.0.post5` and
+`mamba-ssm==2.2.3.post2`. Newer `torch2.6` wheels may install but can fail at
+import time on Colab's PyTorch build with undefined C++ symbols.
+
 The dependency cell uninstalls old `mamba-ssm` / `causal-conv1d` wheels before
 reinstalling, because stale wheels can be linked against the wrong CUDA runtime.
 It also runs a small Mamba model-construction smoke test before training starts.
