@@ -70,9 +70,12 @@ Recommended install strategy in Colab:
 
 - keep Colab's preinstalled CUDA PyTorch/Triton stack
 - install `requirements.txt`
-- install `causal-conv1d` and `mamba-ssm` from EasyWheels with
-  `--prefer-binary` if you have an API key
+- paste your EasyWheels key into the notebook's `EASYWHEELS_API_KEY` variable
+  if you have one, then install `causal-conv1d` and `mamba-ssm` with
+  `--extra-index-url https://YOUR_KEY:@easywheels.io/simple/ --prefer-binary`
 - otherwise fall back to PyPI with `--no-build-isolation`
+
+Leave `EASYWHEELS_API_KEY = ""` to skip EasyWheels and try the PyPI fallback.
 
 The Mamba project documents the same core requirement: install PyTorch first,
 then install Mamba with `--no-build-isolation` so the build uses the active
