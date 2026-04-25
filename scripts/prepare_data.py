@@ -16,7 +16,7 @@ import os
 import numpy as np
 from datasets import load_dataset
 from transformers import AutoTokenizer
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 
 def main(args):
@@ -32,7 +32,7 @@ def main(args):
         print(f"\nTokenizing {split_name} split ({n_examples} examples)...")
         all_ids = []
         count = 0
-        for example in tqdm(ds, total=n_examples, desc=split_name):
+        for example in tqdm(ds, total=n_examples, desc=f"tokenizing {split_name}", unit="example"):
             if count >= n_examples:
                 break
             text = example.get("text", "")

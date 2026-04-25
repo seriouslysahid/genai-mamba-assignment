@@ -13,6 +13,7 @@ import os
 import time
 
 import torch
+from tqdm.auto import tqdm
 from train_mamba import build_mamba, build_transformer
 
 WARMUP_ITERS = 5
@@ -54,7 +55,8 @@ def run(args):
     dtype = resolve_dtype(args.dtype)
     results = []
 
-    for name, builder in [("mamba", build_mamba), ("transformer", build_transformer)]:
+    model_builders = [("mamba", build_mamba), ("transformer", build_transformer)]
+    for name, builder in tqdm(model_builders, desc="benchmark models", unit="model"):
         print(f"\n{'='*50}")
         print(f"Benchmarking: {name}")
         print(f"{'='*50}")
@@ -65,7 +67,7 @@ def run(args):
         n_params = sum(p.numel() for p in model.parameters())
         print(f"Parameters: {n_params / 1e6:.1f}M")
 
-        for seq_len in args.seq_lens:
+        for seq_len in tqdm(args.seq_lens, desc=f"{name} sequence lengths", unit="seq_len"):
             input_ids = torch.randint(0, 50277, (args.batch_size, seq_len), device=device)
             try:
                 tok_s, mem_mb = measure_throughput(model, input_ids)

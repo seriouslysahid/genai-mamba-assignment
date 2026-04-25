@@ -53,7 +53,8 @@ The notebook keeps the original script pipeline intact, but orchestrates it end 
 end in one place:
 
 1. environment check and dependency installation
-2. optional EasyWheels wheel install for `causal-conv1d` and `mamba-ssm`
+2. `mamba-ssm` / `causal-conv1d` installation from official prebuilt GitHub
+   wheels for the pinned Colab `2025.07` runtime
 3. streaming data preparation from `monology/pile-uncopyrighted`
 4. Mamba-130M training
 5. Transformer baseline training
@@ -68,22 +69,35 @@ benchmark methodology remain the same.
 
 Recommended install strategy in Colab:
 
-- keep Colab's preinstalled CUDA PyTorch/Triton stack
+- pin Colab to Runtime Version `2025.07`
+- keep Colab's preinstalled Python 3.11 / PyTorch 2.6 / CUDA 12 stack
 - install `requirements.txt`
-- paste your EasyWheels key into the notebook's `EASYWHEELS_API_KEY` variable
-  if you have one, then install `causal-conv1d` and `mamba-ssm` with
-  `--extra-index-url https://YOUR_KEY:@easywheels.io/simple/ --prefer-binary`
-- otherwise fall back to PyPI with `--no-build-isolation`
+- install official prebuilt GitHub release wheels for `causal-conv1d` and
+  `mamba-ssm`
+- choose the correct CXX11 ABI wheel dynamically from
+  `torch._C._GLIBCXX_USE_CXX11_ABI`
 
-Leave `EASYWHEELS_API_KEY = ""` to skip EasyWheels and try the PyPI fallback.
+The dependency cell uninstalls old `mamba-ssm` / `causal-conv1d` wheels before
+reinstalling, because stale wheels can be linked against the wrong CUDA runtime.
+It also runs a small Mamba model-construction smoke test before training starts.
+
+Default data scale is `25_000` train examples and `2_000` validation examples,
+roughly five times the original smoke-test shard. On a stable Colab Pro/L4
+runtime, `50_000` / `5_000` is a reasonable next step. `100_000` / `10_000` is a
+stretch setting for A100-class sessions. The full dataset is not Colab-practical:
+Hugging Face lists `monology/pile-uncopyrighted` at about 335 GB raw and roughly
+176M rows.
 
 The Mamba project documents the same core requirement: install PyTorch first,
 then install Mamba with `--no-build-isolation` so the build uses the active
 CUDA-enabled PyTorch environment.
 
-## Setup
+## Local/A100 script setup
 
-Recent testing shows that newer Python versions (like 3.12) can cause build instability with `mamba-ssm`. **Python 3.10 is explicitly required.** We recommend an isolated conda environment to ensure stable builds.
+For non-Colab script runs, Python 3.10 remains the safest target for stable
+`mamba-ssm` builds. Colab currently controls the notebook Python runtime, so the
+notebook instead installs against Colab's active PyTorch/CUDA stack and verifies
+the Mamba CUDA extension before training.
 
 Requires Linux, NVIDIA GPU (A100 recommended for BF16), and CUDA 11.6+.
 

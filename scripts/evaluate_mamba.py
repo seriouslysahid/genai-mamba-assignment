@@ -8,6 +8,7 @@ Usage:
 """
 
 import argparse
+from itertools import islice
 import json
 import math
 import os
@@ -15,6 +16,7 @@ import os
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
 from transformers import AutoTokenizer
 from train_mamba import PileShardDataset, build_mamba, build_transformer, DEFAULTS
 
@@ -30,9 +32,9 @@ def resolve_dtype(dtype):
 def evaluate(model, loader, device, max_batches=None):
     model.eval()
     total_loss, total_tokens = 0.0, 0
-    for i, (x, y) in enumerate(loader):
-        if max_batches and i >= max_batches:
-            break
+    total_batches = min(len(loader), max_batches) if max_batches else len(loader)
+    batches = islice(loader, max_batches) if max_batches else loader
+    for x, y in tqdm(batches, total=total_batches, desc="evaluating", unit="batch"):
         x, y = x.to(device), y.to(device)
         logits = model(x).logits
         loss = nn.functional.cross_entropy(

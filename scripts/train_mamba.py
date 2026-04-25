@@ -17,6 +17,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
 from transformers import GPT2Config, GPT2LMHeadModel
 
 DEFAULTS = dict(
@@ -161,7 +162,8 @@ def train(args):
     model.train()
     t0 = time.time()
 
-    for step in range(cfg["max_steps"]):
+    pbar = tqdm(range(cfg["max_steps"]), desc=f"training {cfg['model']}", unit="step")
+    for step in pbar:
         lr = get_lr(step, cfg["warmup_steps"], cfg["max_steps"], cfg["lr"])
         for pg in optimizer.param_groups:
             pg["lr"] = lr
@@ -197,6 +199,11 @@ def train(args):
                               * cfg["seq_len"] * cfg["log_interval"]) / max(dt, 1e-9)
             print(f"step {step:>6d} | loss {accum_loss:.4f} | "
                   f"lr {lr:.2e} | {tokens_per_sec:.0f} tok/s")
+            pbar.set_postfix(
+                loss=f"{accum_loss:.4f}",
+                lr=f"{lr:.2e}",
+                tok_s=f"{tokens_per_sec:.0f}",
+            )
             log["train_loss"].append(accum_loss)
             log["step"].append(step)
             log["throughput"].append(tokens_per_sec)
