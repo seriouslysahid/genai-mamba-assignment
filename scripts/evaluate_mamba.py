@@ -19,6 +19,13 @@ from transformers import AutoTokenizer
 from train_mamba import PileShardDataset, build_mamba, build_transformer, DEFAULTS
 
 
+def resolve_dtype(dtype):
+    if dtype == "auto":
+        return torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+    return {"float32": torch.float32, "bfloat16": torch.bfloat16,
+            "float16": torch.float16}[dtype]
+
+
 @torch.no_grad()
 def evaluate(model, loader, device, max_batches=None):
     model.eval()
@@ -63,10 +70,11 @@ def main(args):
     is_mamba = args.model == "mamba"
 
     print(f"Loading {args.model} model from {args.ckpt}...")
+    dtype = resolve_dtype(args.dtype)
     model = build_mamba() if is_mamba else build_transformer(args.seq_len)
     state = torch.load(args.ckpt, map_location=device, weights_only=True)
     model.load_state_dict(state)
-    model = model.to(device=device, dtype=torch.bfloat16)
+    model = model.to(device=device, dtype=dtype)
 
     n_params = sum(p.numel() for p in model.parameters())
     print(f"Parameters: {n_params / 1e6:.1f}M")
@@ -91,6 +99,7 @@ def main(args):
     results = {
         "model": args.model,
         "checkpoint": args.ckpt,
+        "dtype": str(dtype).replace("torch.", ""),
         "parameters_M": round(n_params / 1e6, 1),
         "val_loss": round(loss, 4),
         "perplexity": round(ppl, 2),
@@ -115,4 +124,6 @@ if __name__ == "__main__":
     parser.add_argument("--data_dir", type=str, default="data")
     parser.add_argument("--out_dir", type=str, default="out")
     parser.add_argument("--seq_len", type=int, default=DEFAULTS["seq_len"])
+    parser.add_argument("--dtype", choices=["auto", "float32", "bfloat16", "float16"],
+                        default="auto")
     main(parser.parse_args())

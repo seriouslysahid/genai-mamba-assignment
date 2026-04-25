@@ -1,5 +1,5 @@
 """
-prepare_data.py — Download and tokenize a small subset of The Pile
+prepare_data.py - Download and tokenize a small subset of The Pile
 for the Mamba reproduction experiments.
 
 Produces data/train.bin and data/val.bin as memory-mapped uint16 arrays.
@@ -7,6 +7,7 @@ Produces data/train.bin and data/val.bin as memory-mapped uint16 arrays.
 Usage:
     python scripts/prepare_data.py
     python scripts/prepare_data.py --num_train 50000 --num_val 2000
+    python scripts/prepare_data.py --dataset_name monology/pile-uncopyrighted
 """
 
 import argparse
@@ -21,11 +22,11 @@ from tqdm import tqdm
 def main(args):
     os.makedirs(args.out_dir, exist_ok=True)
 
-    print("Loading tokenizer (EleutherAI/gpt-neox-20b)...")
-    tokenizer = AutoTokenizer.from_pretrained("EleutherAI/gpt-neox-20b")
+    print(f"Loading tokenizer ({args.tokenizer_name})...")
+    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name)
 
-    print("Loading The Pile (streaming)...")
-    ds = load_dataset("EleutherAI/pile", split="train", streaming=True)
+    print(f"Loading dataset ({args.dataset_name}, streaming train split)...")
+    ds = load_dataset(args.dataset_name, split="train", streaming=True)
 
     for split_name, n_examples in [("train", args.num_train), ("val", args.num_val)]:
         print(f"\nTokenizing {split_name} split ({n_examples} examples)...")
@@ -55,5 +56,11 @@ if __name__ == "__main__":
                         help="Number of Pile examples for training split")
     parser.add_argument("--num_val", type=int, default=2_000,
                         help="Number of Pile examples for validation split")
+    parser.add_argument("--dataset_name", type=str,
+                        default="monology/pile-uncopyrighted",
+                        help="Hugging Face dataset to stream")
+    parser.add_argument("--tokenizer_name", type=str,
+                        default="EleutherAI/gpt-neox-20b",
+                        help="Tokenizer used for uint16 GPT-NeoX token IDs")
     parser.add_argument("--out_dir", type=str, default="data")
     main(parser.parse_args())

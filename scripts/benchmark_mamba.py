@@ -19,6 +19,13 @@ WARMUP_ITERS = 5
 BENCH_ITERS = 20
 
 
+def resolve_dtype(dtype):
+    if dtype == "auto":
+        return torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+    return {"float32": torch.float32, "bfloat16": torch.bfloat16,
+            "float16": torch.float16}[dtype]
+
+
 def measure_throughput(model, input_ids, warmup=WARMUP_ITERS, iters=BENCH_ITERS):
     """Returns (tokens/sec, peak_memory_mb)."""
     torch.cuda.reset_peak_memory_stats()
@@ -44,7 +51,7 @@ def measure_throughput(model, input_ids, warmup=WARMUP_ITERS, iters=BENCH_ITERS)
 
 def run(args):
     device = "cuda"
-    dtype = torch.bfloat16
+    dtype = resolve_dtype(args.dtype)
     results = []
 
     for name, builder in [("mamba", build_mamba), ("transformer", build_transformer)]:
@@ -88,7 +95,7 @@ def run(args):
     os.makedirs(args.out_dir, exist_ok=True)
     meta = {
         "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "unknown",
-        "dtype": "bfloat16",
+        "dtype": str(dtype).replace("torch.", ""),
     }
     out_path = os.path.join(args.out_dir, "benchmark_results.json")
     with open(out_path, "w") as f:
@@ -101,5 +108,7 @@ if __name__ == "__main__":
     parser.add_argument("--seq_lens", type=int, nargs="+",
                         default=[256, 512, 1024, 2048, 4096, 8192])
     parser.add_argument("--batch_size", type=int, default=4)
+    parser.add_argument("--dtype", choices=["auto", "float32", "bfloat16", "float16"],
+                        default="auto")
     parser.add_argument("--out_dir", type=str, default="out")
     run(parser.parse_args())

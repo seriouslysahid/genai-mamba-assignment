@@ -41,6 +41,43 @@ All experiments run on a Lightning.ai instance with an NVIDIA A100 GPU (40GB VRA
 | `benchmark_mamba.py` | Sweeps sequence lengths (256–8192), measures inference throughput and peak GPU memory |
 | `plot_results.py` | Produces training loss, perplexity, throughput, memory, and speedup ratio plots |
 
+## Google Colab workflow
+
+For the current course/demo workflow, use the single Colab notebook:
+
+```
+Mamba_Colab_Workflow.ipynb
+```
+
+The notebook keeps the original script pipeline intact, but orchestrates it end to
+end in one place:
+
+1. environment check and dependency installation
+2. optional EasyWheels wheel install for `causal-conv1d` and `mamba-ssm`
+3. streaming data preparation from `monology/pile-uncopyrighted`
+4. Mamba-130M training
+5. Transformer baseline training
+6. validation perplexity and text generation
+7. throughput and memory benchmarking
+8. plot generation into `out/`
+
+Colab defaults are intentionally smaller than the original A100 run
+(`seq_len=512`, `batch_size=1`, short training, smaller streamed shard). The
+model definitions, tokenizer, binary token shard format, evaluation intent, and
+benchmark methodology remain the same.
+
+Recommended install strategy in Colab:
+
+- keep Colab's preinstalled CUDA PyTorch/Triton stack
+- install `requirements.txt`
+- install `causal-conv1d` and `mamba-ssm` from EasyWheels with
+  `--prefer-binary` if you have an API key
+- otherwise fall back to PyPI with `--no-build-isolation`
+
+The Mamba project documents the same core requirement: install PyTorch first,
+then install Mamba with `--no-build-isolation` so the build uses the active
+CUDA-enabled PyTorch environment.
+
 ## Setup
 
 Recent testing shows that newer Python versions (like 3.12) can cause build instability with `mamba-ssm`. **Python 3.10 is explicitly required.** We recommend an isolated conda environment to ensure stable builds.
