@@ -1,0 +1,23 @@
+{
+  "model": "transformer",
+  "checkpoint": "out/transformer_final.pt",
+  "dtype": "bfloat16",
+  "parameters_M": 125.2,
+  "val_loss": 3.7236,
+  "perplexity": 41.41,
+  "bpb": 5.372,
+  "samples": [
+    {
+      "prompt": "The future of artificial intelligence",
+      "generation": "The future of artificial intelligence, in the world, as well as the power of a world. We are looking for an important role in the world, as we find in the world, as we have developed an effort to establish the system and understand the future of our society. The reality is that we need to know where we are dealing with our own mind.\n\nAs for the beginning of the world, a natural sense of our world is that we live in a world, as we can learn from our planet, as we do, we are looking for a way to do this. The world, as we look for a whole world, as we will see"
+    },
+    {
+      "prompt": "In a recent study, researchers found that",
+      "generation": "In a recent study, researchers found that the development of this study was associated with the development of this study. The results of this study were conducted in this study, including the study, and the studies were conducted in the field of research.\n\nDiscussion {#Sec22}\n==========\n\nThe authors were also involved in the development of this study. All the authors would like to thank M. L. Zai, J.T., A.M., A.M., A.M., Y.M., A.M., A.M., B.M., A.M., A.M., A.M., A.M., A.M"
+    },
+    {
+      "prompt": "State space models are different from transformers because",
+      "generation": "State space models are different from transformers because they are the most efficient methods of the algorithm. The first approach is to use the problem in a way that the algorithm is set to the algorithm. In the case of the algorithm, it is difficult to construct a new method of algorithm, which may be used to test the problem. In the case of the algorithm, the method of algorithm and algorithm is set to the algorithm. In the case of a method of algorithm and algorithm, the method of algorithm and algorithms can be used to find the most useful. To test the problem of the problem of the problem of the problem, a method of algorithm and algorithm are called a simple solution of"
+    }
+  ]
+}

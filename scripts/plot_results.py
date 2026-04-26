@@ -1,283 +1,553 @@
-"""
-Generate plots from training logs and benchmark results.
-Outputs PNGs for the slide deck.
-
-Usage:
-    python scripts/plot_results.py
-    python scripts/plot_results.py --out_dir out --log_dir out
-"""
-
-import argparse
-import json
 import os
+import json
+import argparse
 
-import matplotlib
-matplotlib.use("Agg")
+import numpy as np
 import matplotlib.pyplot as plt
 
 
-plt.rcParams.update({
-    "font.family": "serif",
-    "font.size": 11,
-    "axes.titlesize": 13,
-    "axes.labelsize": 11,
-    "figure.figsize": (7, 4.5),
-    "figure.dpi": 150,
-    "savefig.bbox": "tight",
-    "savefig.pad_inches": 0.15,
-})
+# ======================================================================================
+# STYLE
+# ======================================================================================
 
-COLORS = {"mamba": "#4C72B0", "transformer": "#DD8452"}
+plt.style.use("ggplot")
 
+
+# ======================================================================================
+# HELPERS
+# ======================================================================================
 
 def load_json(path):
-    with open(path) as f:
+    with open(path, "r") as f:
         return json.load(f)
 
 
-def plot_training_loss(mamba_log, transformer_log, out_dir):
-    fig, ax = plt.subplots()
-    ax.plot(mamba_log["step"], mamba_log["train_loss"],
-            label="Mamba-130M", color=COLORS["mamba"], linewidth=1.5)
-    ax.plot(transformer_log["step"], transformer_log["train_loss"],
-            label="Transformer-130M", color=COLORS["transformer"], linewidth=1.5)
-    ax.set_xlabel("Training Step")
-    ax.set_ylabel("Loss")
-    ax.set_title("Training Loss — Mamba vs Transformer")
-    ax.legend()
-    ax.grid(alpha=0.3)
+def ensure_dir(path):
+    os.makedirs(path, exist_ok=True)
+
+
+def print_header(title):
+    print("\n" + "=" * 100)
+    print(title.center(100))
+    print("=" * 100 + "\n")
+
+
+def print_subheader(title):
+    print("-" * 100)
+    print(title.center(100))
+    print("-" * 100)
+
+
+# ======================================================================================
+# TRAINING LOSS
+# ======================================================================================
+
+def plot_training_loss(log_dir, out_dir):
+
+    print_subheader("Generating Training Loss Plot")
+
+    mamba = load_json(os.path.join(log_dir, "mamba_log.json"))
+    transformer = load_json(os.path.join(log_dir, "transformer_log.json"))
+
+    plt.figure(figsize=(10, 6))
+
+    plt.plot(
+        mamba["step"],
+        mamba["train_loss"],
+        label="Mamba",
+        linewidth=2,
+    )
+
+    plt.plot(
+        transformer["step"],
+        transformer["train_loss"],
+        label="Transformer",
+        linewidth=2,
+    )
+
+    plt.xlabel("Training Step")
+    plt.ylabel("Training Loss")
+    plt.title("Training Loss Comparison")
+    plt.legend()
+
     path = os.path.join(out_dir, "training_loss.png")
-    fig.savefig(path)
-    plt.close(fig)
-    print(f"Saved → {path}")
+
+    plt.savefig(path, dpi=220, bbox_inches="tight")
+    plt.close()
+
+    print(f"Saved → {path}\n")
 
 
-def plot_val_perplexity(mamba_log, transformer_log, out_dir):
-    fig, ax = plt.subplots()
-    if mamba_log.get("val_loss"):
-        steps = [v["step"] for v in mamba_log["val_loss"]]
-        ppls = [v["ppl"] for v in mamba_log["val_loss"]]
-        ax.plot(steps, ppls, "o-", label="Mamba-130M",
-                color=COLORS["mamba"], linewidth=1.5, markersize=4)
-    if transformer_log.get("val_loss"):
-        steps = [v["step"] for v in transformer_log["val_loss"]]
-        ppls = [v["ppl"] for v in transformer_log["val_loss"]]
-        ax.plot(steps, ppls, "s-", label="Transformer-130M",
-                color=COLORS["transformer"], linewidth=1.5, markersize=4)
-    ax.set_xlabel("Training Step")
-    ax.set_ylabel("Perplexity")
-    ax.set_title("Validation Perplexity — Mamba vs Transformer")
-    ax.legend()
-    ax.grid(alpha=0.3)
+# ======================================================================================
+# VALIDATION PERPLEXITY
+# ======================================================================================
+
+def plot_val_perplexity(log_dir, out_dir):
+
+    print_subheader("Generating Validation Perplexity Plot")
+
+    mamba = load_json(os.path.join(log_dir, "mamba_log.json"))
+    transformer = load_json(os.path.join(log_dir, "transformer_log.json"))
+
+    m_steps = [x["step"] for x in mamba["val_loss"]]
+    m_ppl = [x["ppl"] for x in mamba["val_loss"]]
+
+    t_steps = [x["step"] for x in transformer["val_loss"]]
+    t_ppl = [x["ppl"] for x in transformer["val_loss"]]
+
+    plt.figure(figsize=(10, 6))
+
+    plt.plot(
+        m_steps,
+        m_ppl,
+        marker="o",
+        linewidth=2,
+        label="Mamba",
+    )
+
+    plt.plot(
+        t_steps,
+        t_ppl,
+        marker="o",
+        linewidth=2,
+        label="Transformer",
+    )
+
+    plt.xlabel("Training Step")
+    plt.ylabel("Validation Perplexity")
+    plt.title("Validation Perplexity Comparison")
+    plt.legend()
+
     path = os.path.join(out_dir, "val_perplexity.png")
-    fig.savefig(path)
-    plt.close(fig)
-    print(f"Saved → {path}")
+
+    plt.savefig(path, dpi=220, bbox_inches="tight")
+    plt.close()
+
+    print(f"Saved → {path}\n")
 
 
-def plot_throughput(bench_results, out_dir):
-    mamba = [r for r in bench_results if r["model"] == "mamba" and r.get("inference_tokens_per_sec")]
-    trans = [r for r in bench_results if r["model"] == "transformer" and r.get("inference_tokens_per_sec")]
+# ======================================================================================
+# BENCHMARK PLOTS
+# ======================================================================================
 
-    fig, ax = plt.subplots()
-    if mamba:
-        ax.plot([r["seq_len"] for r in mamba],
-                [r["inference_tokens_per_sec"] for r in mamba],
-                "o-", label="Mamba-130M", color=COLORS["mamba"], linewidth=1.5)
-    if trans:
-        ax.plot([r["seq_len"] for r in trans],
-                [r["inference_tokens_per_sec"] for r in trans],
-                "s-", label="Transformer-130M", color=COLORS["transformer"], linewidth=1.5)
-    ax.set_xlabel("Sequence Length")
-    ax.set_ylabel("Tokens / sec")
-    ax.set_title("Inference Throughput vs Sequence Length")
-    ax.legend()
-    ax.grid(alpha=0.3)
-    ax.set_xscale("log", base=2)
-    path = os.path.join(out_dir, "throughput.png")
-    fig.savefig(path)
-    plt.close(fig)
-    print(f"Saved → {path}")
+def plot_benchmarks(log_dir, out_dir):
 
+    bench_path = os.path.join(log_dir, "benchmark_results.json")
 
-def plot_training_throughput(bench_results, out_dir):
-    mamba = [r for r in bench_results
-             if r["model"] == "mamba" and r.get("training_tokens_per_sec")]
-    trans = [r for r in bench_results
-             if r["model"] == "transformer" and r.get("training_tokens_per_sec")]
-    
-    fig, ax = plt.subplots()
-    if mamba:
-        ax.plot([r["seq_len"] for r in mamba],
-                [r["training_tokens_per_sec"] for r in mamba],
-                "o-", label="Mamba-130M", color=COLORS["mamba"], linewidth=1.5)
-    if trans:
-        ax.plot([r["seq_len"] for r in trans],
-                [r["training_tokens_per_sec"] for r in trans],
-                "s-", label="Transformer-130M",
-                color=COLORS["transformer"], linewidth=1.5)
-    ax.set_xlabel("Sequence Length")
-    ax.set_ylabel("Training Tokens / sec")
-    ax.set_title("Training Throughput vs Sequence Length\n"
-                 "(forward + backward + optimizer step)")
-    ax.legend()
-    ax.grid(alpha=0.3)
-    ax.set_xscale("log", base=2)
-    path = os.path.join(out_dir, "training_throughput.png")
-    fig.savefig(path)
-    plt.close(fig)
-    print(f"Saved → {path}")
-
-
-def plot_memory(bench_results, out_dir):
-    mamba = [r for r in bench_results if r["model"] == "mamba" and r.get("inference_peak_memory_mb")]
-    trans = [r for r in bench_results if r["model"] == "transformer" and r.get("inference_peak_memory_mb")]
-
-    fig, ax = plt.subplots()
-    if mamba:
-        ax.plot([r["seq_len"] for r in mamba],
-                [r["inference_peak_memory_mb"] / 1024 for r in mamba],
-                "o-", label="Mamba-130M", color=COLORS["mamba"], linewidth=1.5)
-    if trans:
-        ax.plot([r["seq_len"] for r in trans],
-                [r["inference_peak_memory_mb"] / 1024 for r in trans],
-                "s-", label="Transformer-130M", color=COLORS["transformer"], linewidth=1.5)
-    ax.set_xlabel("Sequence Length")
-    ax.set_ylabel("Peak GPU Memory (GB)")
-    ax.set_title("Memory Usage vs Sequence Length")
-    ax.legend()
-    ax.grid(alpha=0.3)
-    ax.set_xscale("log", base=2)
-    path = os.path.join(out_dir, "memory.png")
-    fig.savefig(path)
-    plt.close(fig)
-    print(f"Saved → {path}")
-
-
-def plot_speedup(bench_results, out_dir):
-    mamba = {r["seq_len"]: r["inference_tokens_per_sec"] for r in bench_results
-             if r["model"] == "mamba" and r.get("inference_tokens_per_sec")}
-    trans = {r["seq_len"]: r["inference_tokens_per_sec"] for r in bench_results
-             if r["model"] == "transformer" and r.get("inference_tokens_per_sec")}
-    common = sorted(set(mamba) & set(trans))
-    if not common:
+    if not os.path.exists(bench_path):
+        print("benchmark_results.json not found.\n")
         return
 
-    ratios = [mamba[s] / trans[s] for s in common]
-    fig, ax = plt.subplots()
-    ax.bar([str(s) for s in common], ratios, color=COLORS["mamba"], alpha=0.85)
-    ax.axhline(1.0, color="gray", linestyle="--", linewidth=0.8)
-    ax.set_xlabel("Sequence Length")
-    ax.set_ylabel("Mamba / Transformer Throughput Ratio")
-    ax.set_title("Speedup: Mamba vs Transformer")
-    ax.grid(axis="y", alpha=0.3)
+    raw = load_json(bench_path)
+
+    results = raw["results"] if isinstance(raw, dict) else raw
+
+    mamba = [x for x in results if x["model"] == "mamba"]
+    transformer = [x for x in results if x["model"] == "transformer"]
+
+    seqs = [x["seq_len"] for x in mamba]
+
+    # ------------------------------------------------------------------
+    # Inference throughput
+    # ------------------------------------------------------------------
+
+    print_subheader("Generating Inference Throughput Plot")
+
+    plt.figure(figsize=(10, 6))
+
+    plt.plot(
+        seqs,
+        [x["inference_tokens_per_sec"] for x in mamba],
+        marker="o",
+        linewidth=2,
+        label="Mamba",
+    )
+
+    plt.plot(
+        seqs,
+        [x["inference_tokens_per_sec"] for x in transformer],
+        marker="o",
+        linewidth=2,
+        label="Transformer",
+    )
+
+    plt.xlabel("Sequence Length")
+    plt.ylabel("Tokens / Second")
+    plt.title("Inference Throughput")
+    plt.legend()
+
+    path = os.path.join(out_dir, "inference_throughput.png")
+
+    plt.savefig(path, dpi=220, bbox_inches="tight")
+    plt.close()
+
+    print(f"Saved → {path}\n")
+
+    # ------------------------------------------------------------------
+    # Training throughput
+    # ------------------------------------------------------------------
+
+    print_subheader("Generating Training Throughput Plot")
+
+    plt.figure(figsize=(10, 6))
+
+    plt.plot(
+        seqs,
+        [x["training_tokens_per_sec"] for x in mamba],
+        marker="o",
+        linewidth=2,
+        label="Mamba",
+    )
+
+    plt.plot(
+        seqs,
+        [x["training_tokens_per_sec"] for x in transformer],
+        marker="o",
+        linewidth=2,
+        label="Transformer",
+    )
+
+    plt.xlabel("Sequence Length")
+    plt.ylabel("Tokens / Second")
+    plt.title("Training Throughput")
+    plt.legend()
+
+    path = os.path.join(out_dir, "training_throughput.png")
+
+    plt.savefig(path, dpi=220, bbox_inches="tight")
+    plt.close()
+
+    print(f"Saved → {path}\n")
+
+    # ------------------------------------------------------------------
+    # Memory scaling
+    # ------------------------------------------------------------------
+
+    print_subheader("Generating Memory Usage Plot")
+
+    plt.figure(figsize=(10, 6))
+
+    plt.plot(
+        seqs,
+        [x["training_peak_memory_mb"] for x in mamba],
+        marker="o",
+        linewidth=2,
+        label="Mamba",
+    )
+
+    plt.plot(
+        seqs,
+        [x["training_peak_memory_mb"] for x in transformer],
+        marker="o",
+        linewidth=2,
+        label="Transformer",
+    )
+
+    plt.xlabel("Sequence Length")
+    plt.ylabel("Peak Training Memory (MB)")
+    plt.title("Training Memory Scaling")
+    plt.legend()
+
+    path = os.path.join(out_dir, "memory_scaling.png")
+
+    plt.savefig(path, dpi=220, bbox_inches="tight")
+    plt.close()
+
+    print(f"Saved → {path}\n")
+
+    # ------------------------------------------------------------------
+    # Speedup plot
+    # ------------------------------------------------------------------
+
+    print_subheader("Generating Speedup Plot")
+
+    speedups = []
+
+    for m, t in zip(mamba, transformer):
+
+        speedups.append(
+            m["inference_tokens_per_sec"] /
+            t["inference_tokens_per_sec"]
+        )
+
+    plt.figure(figsize=(10, 6))
+
+    plt.plot(
+        seqs,
+        speedups,
+        marker="o",
+        linewidth=2,
+    )
+
+    plt.xlabel("Sequence Length")
+    plt.ylabel("Mamba Speedup Over Transformer")
+    plt.title("Inference Speedup Scaling")
+
     path = os.path.join(out_dir, "speedup.png")
-    fig.savefig(path)
+
+    plt.savefig(path, dpi=220, bbox_inches="tight")
+    plt.close()
+
+    print(f"Saved → {path}\n")
+
+
+# ======================================================================================
+# SAVE SUMMARY TABLE IMAGE
+# ======================================================================================
+
+def save_summary_table_image(summary, out_dir):
+
+    print_subheader("Saving Final Summary Table Image")
+
+    fig, ax = plt.subplots(figsize=(11, 3.8))
+
+    ax.axis("off")
+
+    headers = [
+        "Metric",
+        "Mamba",
+        "Transformer",
+    ]
+
+    rows = [
+        [
+            "Perplexity",
+            f"{summary['mamba'].get('perplexity', '—'):.2f}",
+            f"{summary['transformer'].get('perplexity', '—'):.2f}",
+        ],
+        [
+            "Bits-per-byte",
+            f"{summary['mamba'].get('bpb', '—'):.2f}",
+            f"{summary['transformer'].get('bpb', '—'):.2f}",
+        ],
+        [
+            "Inference TPS @ 4096",
+            f"{summary['mamba'].get('inf_4096', '—'):,.0f}",
+            f"{summary['transformer'].get('inf_4096', '—'):,.0f}",
+        ],
+        [
+            "Training TPS @ 4096",
+            f"{summary['mamba'].get('trn_4096', '—'):,.0f}",
+            f"{summary['transformer'].get('trn_4096', '—'):,.0f}",
+        ],
+        [
+            "Training Memory @ 4096 (MB)",
+            f"{summary['mamba'].get('mem_4096', '—'):,.1f}",
+            f"{summary['transformer'].get('mem_4096', '—'):,.1f}",
+        ],
+    ]
+
+    table = ax.table(
+        cellText=rows,
+        colLabels=headers,
+        cellLoc="center",
+        loc="center",
+    )
+
+    table.auto_set_font_size(False)
+    table.set_fontsize(11)
+    table.scale(1, 2)
+
+    for col in range(len(headers)):
+        cell = table[(0, col)]
+        cell.set_text_props(weight="bold", color="white")
+        cell.set_facecolor("#1e293b")
+
+    for row in range(1, len(rows) + 1):
+
+        table[(row, 0)].set_facecolor("#dbeafe")
+
+        table[(row, 1)].set_facecolor("#eff6ff")
+
+        table[(row, 2)].set_facecolor("#fef2f2")
+
+    plt.title(
+        "Final Experiment Summary",
+        fontsize=16,
+        weight="bold",
+        pad=18,
+    )
+
+    path = os.path.join(out_dir, "final_summary_table.png")
+
+    fig.savefig(
+        path,
+        bbox_inches="tight",
+        dpi=220,
+    )
+
     plt.close(fig)
-    print(f"Saved → {path}")
+
+    print(f"Saved → {path}\n")
 
 
-def print_slide_summary(log_dir):
-    """Print a ready-to-copy table for slide 15."""
-    import math
-    
+# ======================================================================================
+# SUMMARY TABLE
+# ======================================================================================
+
+def print_summary_table(log_dir, out_dir):
+
+    print_header("FINAL EXPERIMENT SUMMARY")
+
     summary = {}
+
+    # ------------------------------------------------------------------
+    # Eval results
+    # ------------------------------------------------------------------
+
     for model in ["mamba", "transformer"]:
+
         path = os.path.join(log_dir, f"{model}_eval.json")
-        if os.path.exists(path):
-            data = load_json(path)
-            summary[model] = {
-                "perplexity": data.get("perplexity", "—"),
-                "bpb":        data.get("bpb", "—"),
-            }
-    
+
+        if not os.path.exists(path):
+            continue
+
+        data = load_json(path)
+
+        summary[model] = {
+            "perplexity": data.get("perplexity"),
+            "bpb": data.get("bpb"),
+        }
+
+    # ------------------------------------------------------------------
+    # Benchmark results
+    # ------------------------------------------------------------------
+
     bench_path = os.path.join(log_dir, "benchmark_results.json")
+
     if os.path.exists(bench_path):
+
         raw = load_json(bench_path)
-        results = raw["results"] if isinstance(raw, dict) else raw
-        
-        for model in ["mamba", "transformer"]:
+
+        bench = raw["results"] if isinstance(raw, dict) else raw
+
+        for row in bench:
+
+            model = row["model"]
+            seq = row["seq_len"]
+
             if model not in summary:
                 summary[model] = {}
-            
-            for r in results:
-                if r["model"] != model:
-                    continue
-                sl = r["seq_len"]
-                if sl == 1024:
-                    summary[model]["inf_tps_1024"] = (
-                        f"{r['inference_tokens_per_sec']:,.0f}"
-                        if r.get("inference_tokens_per_sec") else "OOM")
-                    summary[model]["trn_tps_1024"] = (
-                        f"{r['training_tokens_per_sec']:,.0f}"
-                        if r.get("training_tokens_per_sec") else "OOM")
-                if sl == 4096:
-                    summary[model]["inf_tps_4096"] = (
-                        f"{r['inference_tokens_per_sec']:,.0f}"
-                        if r.get("inference_tokens_per_sec") else "OOM")
-                    summary[model]["trn_tps_4096"] = (
-                        f"{r['training_tokens_per_sec']:,.0f}"
-                        if r.get("training_tokens_per_sec") else "OOM")
-                    summary[model]["trn_mem_4096"] = (
-                        f"{r['training_peak_memory_mb']/1024:.2f} GB"
-                        if r.get("training_peak_memory_mb") else "OOM")
-    
-    print("\n" + "=" * 62)
-    print("SLIDE 15 — Benchmark Results (copy into slides)")
-    print("=" * 62)
-    print(f"{'Metric':<32} {'Mamba':>12} {'Transformer':>14}")
-    print("-" * 62)
-    
-    rows = [
-        ("Perplexity",                    "perplexity",  "perplexity"),
-        ("BPB",                           "bpb",         "bpb"),
-        ("Inf. throughput @ 1024 (tok/s)","inf_tps_1024","inf_tps_1024"),
-        ("Trn. throughput @ 1024 (tok/s)","trn_tps_1024","trn_tps_1024"),
-        ("Inf. throughput @ 4096 (tok/s)","inf_tps_4096","inf_tps_4096"),
-        ("Trn. throughput @ 4096 (tok/s)","trn_tps_4096","trn_tps_4096"),
-        ("Trn. memory @ 4096",            "trn_mem_4096","trn_mem_4096"),
-    ]
-    
-    for label, mkey, tkey in rows:
-        m = summary.get("mamba", {}).get(mkey, "—")
-        t = summary.get("transformer", {}).get(tkey, "—")
-        print(f"{label:<32} {str(m):>12} {str(t):>14}")
-    
-    print("=" * 62)
 
+            if seq == 4096:
+
+                summary[model]["inf_4096"] = row.get(
+                    "inference_tokens_per_sec"
+                )
+
+                summary[model]["trn_4096"] = row.get(
+                    "training_tokens_per_sec"
+                )
+
+                summary[model]["mem_4096"] = row.get(
+                    "training_peak_memory_mb"
+                )
+
+    print(
+        f"{'Metric':<38}"
+        f"{'Mamba':>20}"
+        f"{'Transformer':>20}"
+    )
+
+    print("-" * 100)
+
+    rows = [
+        ("Perplexity", "perplexity"),
+        ("Bits-per-byte", "bpb"),
+        ("Inference TPS @ 4096", "inf_4096"),
+        ("Training TPS @ 4096", "trn_4096"),
+        ("Training Memory @ 4096 MB", "mem_4096"),
+    ]
+
+    for label, key in rows:
+
+        m = summary.get("mamba", {}).get(key, "—")
+        t = summary.get("transformer", {}).get(key, "—")
+
+        if isinstance(m, float):
+            m = round(m, 2)
+
+        if isinstance(t, float):
+            t = round(t, 2)
+
+        print(
+            f"{label:<38}"
+            f"{str(m):>20}"
+            f"{str(t):>20}"
+        )
+
+    print("=" * 100)
+
+    try:
+
+        m_inf = summary["mamba"]["inf_4096"]
+        t_inf = summary["transformer"]["inf_4096"]
+
+        m_mem = summary["mamba"]["mem_4096"]
+        t_mem = summary["transformer"]["mem_4096"]
+
+        speedup = m_inf / t_inf
+        mem_ratio = t_mem / m_mem
+
+        print("\nKEY OBSERVATIONS\n")
+
+        print(
+            f"• Mamba inference is {speedup:.2f}× faster "
+            f"than Transformer at seq_len=4096"
+        )
+
+        print(
+            f"• Transformer uses {mem_ratio:.2f}× more "
+            f"training memory at seq_len=4096"
+        )
+
+    except Exception:
+        pass
+
+    print("\n" + "=" * 100)
+
+    save_summary_table_image(summary, out_dir)
+
+
+# ======================================================================================
+# MAIN
+# ======================================================================================
 
 def main(args):
-    os.makedirs(args.out_dir, exist_ok=True)
 
-    # Training curves
-    mamba_log_path = os.path.join(args.log_dir, "mamba_log.json")
-    trans_log_path = os.path.join(args.log_dir, "transformer_log.json")
-    if os.path.exists(mamba_log_path) and os.path.exists(trans_log_path):
-        mamba_log = load_json(mamba_log_path)
-        trans_log = load_json(trans_log_path)
-        plot_training_loss(mamba_log, trans_log, args.out_dir)
-        plot_val_perplexity(mamba_log, trans_log, args.out_dir)
-    else:
-        print(f"Training logs not found in {args.log_dir}. Skipping loss/ppl plots.")
+    ensure_dir(args.out_dir)
 
-    # Benchmark results
-    bench_path = os.path.join(args.log_dir, "benchmark_results.json")
-    if os.path.exists(bench_path):
-        raw = load_json(bench_path)
-        # handle both old (list) and new ({meta, results}) formats
-        bench = raw["results"] if isinstance(raw, dict) and "results" in raw else raw
-        plot_throughput(bench, args.out_dir)
-        plot_training_throughput(bench, args.out_dir)
-        plot_memory(bench, args.out_dir)
-        plot_speedup(bench, args.out_dir)
-    else:
-        print(f"Benchmark results not found at {bench_path}. Skipping throughput/memory plots.")
-    
-    print_slide_summary(args.log_dir)
+    print_header("GENERATING EXPERIMENT PLOTS")
 
+    plot_training_loss(args.log_dir, args.out_dir)
+
+    plot_val_perplexity(args.log_dir, args.out_dir)
+
+    plot_benchmarks(args.log_dir, args.out_dir)
+
+    print_summary_table(args.log_dir, args.out_dir)
+
+    print_header("ALL PLOTS GENERATED SUCCESSFULLY")
+
+
+# ======================================================================================
+# ENTRY
+# ======================================================================================
 
 if __name__ == "__main__":
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("--log_dir", type=str, default="out")
-    parser.add_argument("--out_dir", type=str, default="out")
+
+    parser.add_argument(
+        "--log_dir",
+        type=str,
+        default="out",
+    )
+
+    parser.add_argument(
+        "--out_dir",
+        type=str,
+        default="out",
+    )
+
     main(parser.parse_args())
