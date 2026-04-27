@@ -3,21 +3,21 @@
   "checkpoint": "out/mamba_final.pt",
   "dtype": "bfloat16",
   "parameters_M": 129.1,
-  "val_loss": 3.4404,
-  "perplexity": 31.2,
-  "bpb": 4.9634,
+  "val_loss": 3.5288,
+  "perplexity": 34.08,
+  "bpb": 5.0909,
   "samples": [
     {
       "prompt": "The future of artificial intelligence",
-      "generation": "The future of artificial intelligence has been well-founded. We have recently grown our attention to the importance of human intelligence to human intelligence, and the value of human intelligence. In order to address this issue we have developed and developed the technologies of human human intelligence that may be a powerful tool for understanding human human human information. We now develop a method for the human human intelligence to study human intelligence. We first develop a novel novel human human intelligence method to extract human human human human intelligence. To this end, we propose a new method of human human human intelligence that can be used to evaluate human brain information, and a new technology to control human human intelligence."
+      "generation": "The future of artificial intelligence.\n\nThe idea of the world is similar to our recent model of social networks. However, the more complex the brain is, the more and less the more people are able to understand and understand the ways in which they are, and what their impact is on human lives.\n\nIn this book, we will focus on the real world. The human brain is the world\u2019s largest, world-class, world. It is one of the world\u2019s most influential and well-known human beings in the world. It is in the world of human life.\n\nIn the world, the world is the world. Its"
     },
     {
       "prompt": "In a recent study, researchers found that",
-      "generation": "In a recent study, researchers found that the development of an acute, systemic, and systemic therapy with a high dose of a long-acting, anti-inflammatory, anti-inflammatory, anti-inflammatory and anti-inflammatory medications, led to an improved understanding of the mechanism of the administration of anti-inflammatory drugs. The use of this inhibitors has been shown to significantly decrease the risk of the disease and is associated with a reduction in incidence of the disease [@pone.0065979-Bierne1], [@pone.0065979-Rapre1], [@pone.0065979-Kos1]. The reduction in the treatment of an acute myocardial infarction is"
+      "generation": "In a recent study, researchers found that the higher levels of glucose and cholesterol were the only independent factors of glucose metabolism. In particular, this study reported that glucose, which is a major component of glucose metabolism, is associated with the development of cardiovascular disease, and this suggests that the metabolism of insulin and glucose has a profound impact on glucose metabolism.\n\nA number of studies have shown that glucose metabolism is a key factor in insulin synthesis and insulin resistance. In this review, we describe the effects of glucose and glucose in the rat brain of rats by using a glucose-dependent glucose-independent insulin-dependent insulin-dependent insulin-dependent insulin resistance model.\n\nResults\n======="
     },
     {
       "prompt": "State space models are different from transformers because",
-      "generation": "State space models are different from transformers because of their ability to achieve a linear distribution of states over the whole network. This is not a consequence of the fact that the two-state models (such as the spin-1/2-D model, as well as the other-state models, are known for their use in the theory of non-linear models) are not applicable to the case of finite fields.\n\nThe most interesting feature of a multi-state model is that one-loop model can be combined to a linear system of non-linear variables, which can be used to construct the first-loop model. This is the case here: the one-loop"
+      "generation": "State space models are different from transformers because they provide an adequate representation of a set of parameters of a class of variables.\n\nThe model can be viewed as the basis of the state representation of the variable and the corresponding field components. This is given by $$\\begin{aligned}\n \\label{eq:model}\n    C_x = \\left\\{ \\begin{array}{c}\n     C_x & C_x \\\\\n     C_x & C_y \\\\\n     C_y & C_y \\\\\n     C_y & C_y \\\\\n     C_x & C_y & C_y \\\\"
     }
   ]
 }
