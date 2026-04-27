@@ -1,0 +1,23 @@
+{
+  "model": "mamba",
+  "checkpoint": "out/mamba_final.pt",
+  "dtype": "bfloat16",
+  "parameters_M": 129.1,
+  "val_loss": 3.5288,
+  "perplexity": 34.08,
+  "bpb": 5.0909,
+  "samples": [
+    {
+      "prompt": "The future of artificial intelligence",
+      "generation": "The future of artificial intelligence.\n\nThe idea of the world is similar to our recent model of social networks. However, the more complex the brain is, the more and less the more people are able to understand and understand the ways in which they are, and what their impact is on human lives.\n\nIn this book, we will focus on the real world. The human brain is the world\u2019s largest, world-class, world. It is one of the world\u2019s most influential and well-known human beings in the world. It is in the world of human life.\n\nIn the world, the world is the world. Its"
+    },
+    {
+      "prompt": "In a recent study, researchers found that",
+      "generation": "In a recent study, researchers found that the higher levels of glucose and cholesterol were the only independent factors of glucose metabolism. In particular, this study reported that glucose, which is a major component of glucose metabolism, is associated with the development of cardiovascular disease, and this suggests that the metabolism of insulin and glucose has a profound impact on glucose metabolism.\n\nA number of studies have shown that glucose metabolism is a key factor in insulin synthesis and insulin resistance. In this review, we describe the effects of glucose and glucose in the rat brain of rats by using a glucose-dependent glucose-independent insulin-dependent insulin-dependent insulin-dependent insulin resistance model.\n\nResults\n======="
+    },
+    {
+      "prompt": "State space models are different from transformers because",
+      "generation": "State space models are different from transformers because they provide an adequate representation of a set of parameters of a class of variables.\n\nThe model can be viewed as the basis of the state representation of the variable and the corresponding field components. This is given by $$\\begin{aligned}\n \\label{eq:model}\n    C_x = \\left\\{ \\begin{array}{c}\n     C_x & C_x \\\\\n     C_x & C_y \\\\\n     C_y & C_y \\\\\n     C_y & C_y \\\\\n     C_x & C_y & C_y \\\\"
+    }
+  ]
+}

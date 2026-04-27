@@ -1,0 +1,6 @@
+transformers>=4.36
+datasets>=2.16
+matplotlib>=3.7
+tqdm
+numpy
+einops
